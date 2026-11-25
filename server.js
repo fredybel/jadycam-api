@@ -113,10 +113,30 @@ app.post("/api/cameras/anchor", async (req, res) => {
     const docRef = camerasCollection.doc(cleanKey);
     const docSnap = await docRef.get();
 
+    // AQUÍ VA EL BLOQUE: si la cámara aún no existe en Firestore, la crea y ancla de una vez
     if (!docSnap.exists) {
-      return res.status(404).json({ message: "No se encontró la cámara especificada." });
+      const countSnap = await camerasCollection.count().get();
+      const nextId = (countSnap.data().count || 0) + 1;
+
+      const newCamera = {
+        Id: nextId,
+        StreamKey: cleanKey,
+        Name: `Cámara ${cleanKey}`,
+        Location: "Sin ubicación",
+        WifiSsid: String(wifi_ssid).trim(),
+        AnchoredAt: new Date().toISOString(),
+        StreamUrl: `${STREAM_BASE_URL}/${cleanKey}/index.m3u8`
+      };
+
+      await docRef.set(newCamera);
+
+      return res.status(200).json({
+        message: `Cámara anclada a ${newCamera.WifiSsid}`,
+        camera: newCamera
+      });
     }
 
+    // Si ya existía, solo actualiza su red y fecha de anclaje
     const updatedFields = {
       WifiSsid: String(wifi_ssid).trim(),
       AnchoredAt: new Date().toISOString()
